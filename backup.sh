@@ -9,15 +9,13 @@ DB=world               #can give multiple DB names comma separated
 # What day to make the full weekly backup? Monday=1, Tuesday=2, .., Sunday=7
 WEEKLYBACKUPDAY=7
 WEEKLYBACKUPHOUR=01
-# What time (hour) daily backup will be taken
+
 # daily backup will be incremental backup from last full backup
 # on first day, backup will be small because it will be contain one day data, but will increase every day
-DAILYBACKUPHOUR=06
-# Inc backup, turn by default (disable: INC=false) 
 # Incremental backup frequency depends upon the cron job timing
 # Incremental backup will be very fast, bacuase it will only take backup from last incremental backup
 # For example if cronjob is setup after 1 hour for this script, Incremental backup will always contain last 1 hour changes only
-INC=true
+
 # Backup directory
 DIR=/opt/MySQLBackups
 # Configuration file with username and password
@@ -27,10 +25,6 @@ LOG=/opt/MySQLBackups/log/test.log
 DEBUG=0   # Print Debug information, 0 to unset
 #Full backup copies to be retained, will delete older than this automatically
 backup_copies=1
-
-
-# What backup are we going to do? default is 'daily'
-TYPE=daily
 
 ### END SETTINGS ###
 
@@ -128,12 +122,9 @@ backup_type()
 	if [ $WEEKLYBACKUPDAY -eq $DAYOFWEEK -a $WEEKLYBACKUPHOUR = $HOUROFDAY ]; then
 	    echo "Do Full backup: $DATELONG"
 	    TYPE=full
-	fi
-
-	# If daily, set TYPE=daily
-	if [ $DAILYBACKUPHOUR -eq $HOUROFDAY ] ; then
-	    echo "Do Daily Incremental Level backup: $DATELONG"
-	    TYPE=daily
+	else
+	    echo "Do Incremental backup: $DATELONG"
+		TYPE=daily
 	fi
 
 }

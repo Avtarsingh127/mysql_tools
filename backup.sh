@@ -1,11 +1,16 @@
 #!/bin/sh
 #
 #Author: Avtar Singh, avtarsingh127@gmail.com
-#Version: 0.1
+#Version: 0.2
 #Prequesties: sudo apt-get install percona-xtrabackup
 #####  SETTINGS  #####
 
-DB=world               #can give multiple DB names comma separated
+# CREATE USER 'bkpuser'@'localhost' IDENTIFIED BY 'gEt4jhjd(fdg!5g5afD';
+# GRANT RELOAD,PROCESS, LOCK TABLES, REPLICATION CLIENT ON *.* TO 'bkpuser'@'localhost';
+# Flush privileges;
+
+
+DB=testdb              #can give multiple DB names comma separated
 # What day to make the full weekly backup? Monday=1, Tuesday=2, .., Sunday=7
 WEEKLYBACKUPDAY=7
 WEEKLYBACKUPHOUR=01
@@ -16,14 +21,14 @@ WEEKLYBACKUPHOUR=01
 # Incremental backup frequency depends upon the cron job timing
 # Incremental backup will be very fast, bacuase it will only take backup from last incremental backup
 # For example if cronjob is setup after 1 hour for this script, Incremental backup will always contain last 1 hour changes only
-
+# mkdir /var/log/mysql/backup -p
 # Backup directory
-DIR=/opt/MySQLBackups
+DIR=/mnt/dbbackup
 # Configuration file with username and password
-DEFAULTS=/opt/MySQLBackups/server.cnf
+DEFAULTS=/etc/mysql_backup_server.cnf
 # Log Files
-BACKUPLOG=/opt/MySQLBackups/log/innobackupex.log
-SCRIPTLOG=/opt/MySQLBackups/log/log_`date +%Y-%m-%d\_%H-%M-%S`.log
+BACKUPLOG=$DIR/log/innobackupex.log
+SCRIPTLOG=/var/log/mysql/backup/log_`date +%Y-%m-%d\_%H-%M-%S`.log
 
 DEBUG=0   # Print Debug information on screen, 0 to unset
 #Full backup copies to be retained, will delete older than this automatically
@@ -41,9 +46,6 @@ DATESHORT=`date +%Y-%m-%d`
 
 debug_info()
 {
-	if [ ! -e "$DIR/log" ]; then
-		mkdir -p "$DIR/log"  # need to create otherwise log file will give error
-	fi
 	if [ $DEBUG -eq 1 ]; then
 		echo "DEBUG - $1" | tee -a $SCRIPTLOG
 	else 
@@ -147,7 +149,7 @@ find_base_and_target()
 		debug_info "We have found the latest backup for today $LASTBACKUPPATH, we need to fetch latest incremental backup inside this directory"
 		mkdir -p $LASTBACKUPPATH/incr
 
-		LASTINCPATH=`ls -d $DIR/$type/incr/*/ | grep $DATESHORT | sort | tail -n 1` 2>/dev/null
+		LASTINCPATH=`ls -d $LASTBACKUPPATH/incr/*/ | grep $DATESHORT | sort | tail -n 1` 2>/dev/null
 		TARGETDIR=$LASTBACKUPPATH/incr  # incremental backup will be inside today's backup folder
 		#debug_info "1. TARGETDIR=$TARGETDIR"
 		if [ "x$LASTINCPATH" != 'x' ]; then
@@ -246,12 +248,54 @@ cleanup_older()
 	fi
 }
 
+# In this function we are checking if a shared drive is mounted or not.
+# if not mounted we try to mount it before taking backup
+# Example here is for cifs share
+prebackup()
+	{
+		is_prebackup=0
+		if mountpoint -q /mnt/dbbackup 
+		then
+	   		debug_info "Shared drive is already mounted"
+		else
+	   		debug_info "Shared drive is not mounted, trying mounting..."
+	   		mount -t cifs //<IP Address>/<sharedFolderName> /mnt/dbbackup -o username=<username>,password=<"password">,domain=nixcraft
+	   		if [ $? -eq 0]; then
+	   			debug_info "Shared drive mounted succesfully"
+			else
+			  debug_info "Mount Failed :( "
+			  is_prebackup=1
+			fi
+		fi
+	}
+
+send_failed_email()
+	{
+		successful=$(tail -n 1 /mnt/dbbackup/log/innobackupex.log | grep -i "completed OK" | wc -l)
+		if [ $successful -ne 1 ]
+		then
+			MAILTO="asingh@wellshade.com"
+			SUBJECT="Subject: Database backup failed"
+			BODY="Database backup failed on server <server name>, please check $BACKUPLOG and $SCRIPTLOG for more details." 
+			
+			echo -en "$SUBJECT\n\n$BODY">/tmp/failed_`date +%Y-%m-%d\_%H-%M-%S`.log
+			sendmail $MAILTO</tmp/failed_$SCRIPTLOG
+
+		fi
+	}
 ##### SCRIPT START POINT ####
-
-checkdbconnection
-make_dir
-backup_type
-decider
-cleanup_older
-echo "Backup is completed, please check $BACKUPLOG and $SCRIPTLOG for more details" | tee -a $SCRIPTLOG
-
+is_prebackup=0
+prebackup
+if [ $is_prebackup -eq 0 ]
+	then
+		checkdbconnection
+		make_dir
+		backup_type
+		decider
+		send_failed_email
+#post_backup
+#cleanup_older
+		debug_info "Backup is completed, please check $BACKUPLOG and $SCRIPTLOG for more details" | tee -a $SCRIPTLOG
+else
+	debug_info "Backup failed, please check $BACKUPLOG and $SCRIPTLOG for more details" 
+fi

@@ -2,7 +2,14 @@
 #
 #Author: Avtar Singh, avtarsingh127@gmail.com
 #Version: 0.2
-#Prequesties: sudo apt-get install percona-xtrabackup
+#Prequesties: 
+#########Ubuntu#########
+#	sudo apt-get install percona-xtrabackup
+
+#########REDHAT or CensOS #########
+# yum install http://www.percona.com/downloads/percona-release/redhat/0.1-4/percona-release-0.1-4.noarch.rpm
+# yum install percona-xtrabackup-24
+# yum install qpress
 #####  SETTINGS  #####
 
 # CREATE USER 'bkpuser'@'localhost' IDENTIFIED BY 'gEt4jhjd(fdg!5g5afD';
